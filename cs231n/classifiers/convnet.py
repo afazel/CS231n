@@ -17,7 +17,7 @@ class MyFullyConvNet(object):
   """
   
   def __init__(self, convlayer_params, affinelayer_params, weight_scale=1e-3, 
-               reg=0.0, input_dim=(3, 32, 32), num_classes=10, 
+               reg=0.0, input_dim=(1, 48, 48), num_classes=10, 
                dtype=np.float32):              
     """
     Initialize a new network.
