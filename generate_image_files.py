@@ -8,11 +8,11 @@ def get_data():
     IMG_WIDTH = 48
 
 
-    x_train = np.empty([1,48,48])
+    x_train = np.empty([1, 48, 48])
     y_train = np.empty([1])
-    x_test = np.empty([1,48,48])
+    x_test = np.empty([1, 48, 48])
     y_test =np.empty([1])
-    x_val = np.empty([1,48,48])
+    x_val = np.empty([1, 48, 48])
     y_val = np.empty([1])
     kaggle_data = {}
 
@@ -22,7 +22,9 @@ def get_data():
         for line in f:
             
             kaggle_label, data_str, category = line.split(',')[:3]
-            print "data #%s, emotion class:%s, category:%s" % (counter, kaggle_label, category)
+            if (counter % 100) == 0:
+                print "data #%s, emotion class:%s, category:%s" % (counter, kaggle_label, category)
+                
             counter += 1
             data = data_str.split(' ')
             img = np.empty(shape=(1, IMG_HEIGHT, IMG_WIDTH), dtype=np.uint8)
