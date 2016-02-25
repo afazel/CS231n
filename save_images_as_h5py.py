@@ -23,6 +23,7 @@ def save_data() :
         next(f) # ignore header
         for line in f:
             kaggle_label, data_str, category = line.split(',')[:3]
+            
             data = data_str.split(' ')
             img = np.empty(shape=(IMG_HEIGHT, IMG_WIDTH), dtype = np.uint8)
             for idx, val in enumerate(data):
@@ -34,6 +35,7 @@ def save_data() :
                 print train_idx
                 x_training[train_idx, :, :] = img
                 y_trainig[train_idx] = int(kaggle_label)
+                print type(y_trainig[train_idx])
                 train_idx += 1
             elif category == "PublicTest":
                 print val_idx
@@ -47,30 +49,15 @@ def save_data() :
                 test_idx += 1
 
 
-    h5f_train = h5py.File('/Users/azarf/Documents/Courses/Winter2016/CS231N/project/training_data.h5', 'w')
-    h5f_train.create_dataset('dataset_1', data = x_training)
-    h5f_train.close()
+    h5f_file= h5py.File('/Users/azarf/Documents/Courses/Winter2016/CS231N/project/data.h5', 'w')
+    h5f_file.create_dataset('X_train', data = x_training)
+    h5f_file.create_dataset('X_val', data = x_validation)
+    h5f_file.create_dataset('X_test', data = x_test)
+    h5f_file.create_dataset('y_train', data = y_trainig)
+    h5f_file.create_dataset('y_val', data = y_validation)
+    h5f_file.create_dataset('y_test', data = y_test)
+    h5f_file.close()
 
-    h5f_test = h5py.File('/Users/azarf/Documents/Courses/Winter2016/CS231N/project/test_data.h5', 'w')
-    h5f_test.create_dataset('dataset_2', data = x_test)
-    h5f_test.close()
-
-    h5f_val = h5py.File('/Users/azarf/Documents/Courses/Winter2016/CS231N/project/validation_data.h5', 'w')
-    h5f_val.create_dataset('dataset_3', data = x_validation)
-    h5f_val.close()
-
-    h5f_train_y = h5py.File('/Users/azarf/Documents/Courses/Winter2016/CS231N/project/training_labels.h5', 'w')
-    h5f_train_y.create_dataset('dataset_4', data = y_trainig)
-    h5f_train_y.close()
-
-    h5f_test_y = h5py.File('/Users/azarf/Documents/Courses/Winter2016/CS231N/project/test_labels.h5', 'w')
-    h5f_test_y.create_dataset('dataset_5', data = y_test)
-    h5f_test_y.close()
-
-    h5f_val_y = h5py.File('/Users/azarf/Documents/Courses/Winter2016/CS231N/project/validation_labels.h5', 'w')
-    h5f_val_y.create_dataset('dataset_6', data = y_validation)
-    h5f_val_y.close()
-     
                
 save_data()
             
