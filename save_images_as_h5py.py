@@ -59,7 +59,7 @@ def save_data() :
     h5f_val.create_dataset('dataset_3', data = x_validation)
     h5f_val.close()
 
-    h5f_train_y = h5py.File('/Users/azarf/Documents/Courses/Winter2016/CS231N/project/training_lebels.h5', 'w')
+    h5f_train_y = h5py.File('/Users/azarf/Documents/Courses/Winter2016/CS231N/project/training_labels.h5', 'w')
     h5f_train_y.create_dataset('dataset_4', data = y_trainig)
     h5f_train_y.close()
 
