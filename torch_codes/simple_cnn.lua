@@ -4,7 +4,7 @@ require 'hdf5'
 require 'optim'
 require 'gnuplot' --or 'image'
 
-path = '/Users/shima/Documents/MyQuarters/Quarter14/CS231n/final_project/CS231n/dataset/data.h5'
+path = '/Users/azarf/Documents/Courses/Winter2016/CS231N/project/CS231n/data.h5'
 
 local function load_data(data_file)
   local f = hdf5.open(data_file)
@@ -74,6 +74,9 @@ local function check_accuracy(X, y, model, batch_size)
     --y_batch = y_batch:cuda()
     local scores = model:forward(X_batch)
     local _, y_pred = scores:max(2)
+    
+    y_batch = torch.LongTensor():resize(y_batch:size()):copy(y_batch)
+  
     num_correct = num_correct + torch.eq(y_pred, y_batch):sum()
     num_tested = num_tested + batch_size
   end
@@ -180,10 +183,10 @@ crit = nn.CrossEntropyCriterion()
 
 -- set some hyperparameters
 local batch_size = 50
-local reg = 0
-local num_iterations = 10
+local reg = 1e-3
+local num_iterations = 10000
 local config = {
-  learningRate=1e-2,
+  learningRate = 1e-2,
 }
 
 
