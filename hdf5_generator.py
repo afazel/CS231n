@@ -23,7 +23,7 @@ def generate(DATA_FILENAME) :
         next(f) # ignore header
         for line in f:
             kaggle_label, data_str, category = line.split(',')[:3]
-            
+            print kaggle_label, kaggle_label.dtype
             data = data_str.split(' ')
             img = np.empty(shape=(IMG_HEIGHT, IMG_WIDTH), dtype = np.uint8)
             for idx, val in enumerate(data):
@@ -34,18 +34,19 @@ def generate(DATA_FILENAME) :
             if category == "Training":
                 print train_idx
                 x_training[train_idx, :, :] = img
-                y_trainig[train_idx] = int(kaggle_label)
+                y_trainig[train_idx] = kaggle_label.astype(np.int64)
                 print type(y_trainig[train_idx])
                 train_idx += 1
             elif category == "PublicTest":
                 print val_idx
                 x_validation[val_idx, :, :] = img
-                y_validation[val_idx] = int(kaggle_label)
+                y_validation[val_idx] = kaggle_label.astype(np.int64)
                 val_idx += 1
             elif category == "PrivateTest":
                 print test_idx
                 x_test[test_idx, :, :] = img
-                y_test[test_idx] = int(kaggle_label)
+                y_test[test_idx] = kaggle_label.astype(np.int64)
+                
                 test_idx += 1
 
 
