@@ -113,27 +113,30 @@ local function full_conv_net(convlayer_params, affinelayer_params, w_scale)
 
     model:add(nn.SpatialConvolution(next_C, num_filters[i], filter_sizes[i], filter_sizes[i], 
                 filter_strides[i], filter_strides[i], zero_pad, zero_pad))
-    --print('bias:', model:get(layer_counter+1).bias)
-    --print('weight:', model:get(layer_counter+1).weight)
-    --layer_counter = layer_counter + 1
-    --print(m[layer_counter].bias)
-    --m[layer_counter].weight = torch.randn(num_filters[i], next_C, filter_sizes[i], filter_sizes[i])/ w_scale
-    --print('bias:', model:get(layer_counter).bias)
-    --print('weight:', model:get(layer_counter).weight)
+
+    -- Manually initialize bias and weights
+    layer_counter = layer_counter + 1 
+    m[layer_counter].bias:fill(0)
+    m[layer_counter].weight:randn(num_filters[i], next_C, filter_sizes[i], filter_sizes[i])
+    m[layer_counter].weight:div(w_scale)
 
     -- data size after conv layer operation   
     next_C = num_filters[i]
     next_W = (next_W + 2*zero_pad - filter_sizes[i]) / filter_strides[i] + 1
     next_H = (next_H + 2*zero_pad - filter_sizes[i]) / filter_strides[i] + 1
-    print('C, W, H', next_C, next_W, next_H)
         
     if use_sbatchnorm then
         model:add(nn.SpatialBatchNormalization(next_C))
+        layer_counter = layer_counter + 1
+        m[layer_counter].weight:fill(1.0)
+        m[layer_counter].bias:fill(0.0)
     end
             
     model:add(nn.ReLU())
+    layer_counter = layer_counter + 1
 
     model:add(nn.SpatialMaxPooling(maxpool_dim, maxpool_dim, maxpool_stride, maxpool_stride))
+    layer_counter = layer_counter + 1
     
     -- data size after max pooling operation
     next_W = (next_W - maxpool_dim) / maxpool_stride + 1
@@ -142,31 +145,39 @@ local function full_conv_net(convlayer_params, affinelayer_params, w_scale)
     
   local next_D = next_C * next_W * next_H
   model:add(nn.View(-1):setNumInputDims(3))
-        
+  layer_counter = layer_counter + 1
+      
   for i = 1, #hidden_dims do
+
     model:add(nn.Linear(next_D, hidden_dims[i]))
-    --layer_counter = layer_counter + 1
-    --model:get(layer_counter).bias:fill(0)
-    --model:get(layer_counter).weight = torch.randn(next_D, hidden_dims[i])/ w_scale
+    layer_counter = layer_counter + 1
+    m[layer_counter].bias:fill(0)
+    --m[layer_counter].weight:randn(next_D, hidden_dims[i]) 
+    --m[layer_counter].weight:div(w_scale)
     next_D = hidden_dims[i]
     
     if use_batchnorm then
       model:add(nn.BatchNormalization(hidden_dims[i]))
+      layer_counter = layer_counter + 1
+      m[layer_counter].weight:fill(1.0)
+      m[layer_counter].bias:fill(0.0)
     end
     
     if use_dropout then
       model:add(nn.Dropout(0.5))
+      layer_counter = layer_counter + 1
     end
                     
     model:add(nn.ReLU())
+    layer_counter = layer_counter + 1
 
   end
                 
   model:add(nn.Linear(next_D, num_classes))
-  --layer_counter = layer_counter + 1
-  --model:get(layer_counter).bias:fill(0)
-  --model:get(layer_counter).weight = torch.randn(next_D, num_classes)/ w_scale  
-  
+  layer_counter = layer_counter + 1
+  m[layer_counter].bias:fill(0)
+  --m[layer_counter].weight:randn(next_D, num_classes)
+  --m[layer_counter].weight:div(w_scale)
   return model
 end
 
@@ -202,8 +213,8 @@ crit = nn.CrossEntropyCriterion()
 
 -- Sanity check 1: initial loss
 local convlayer_params = {['num_filters']= {32, 32}, ['filter_size']= {3, 3} ,['stride']={1, 1}, 
-                          ['s_batch_norm']= false, ['pool_dims']= 2, ['pool_strides']= 2}
-local affinelayer_params = {['hidden_dims']= {100}, ['batch_norm']= false,['dropout']= false}
+                          ['s_batch_norm']= true, ['pool_dims']= 2, ['pool_strides']= 2}
+local affinelayer_params = {['hidden_dims']= {100}, ['batch_norm']= true,['dropout']= false}
 
 local w_scale = 5e-2
 model = full_conv_net(convlayer_params, affinelayer_params, w_scale)
@@ -222,15 +233,15 @@ local sanity_data_loss = crit:forward(sanity_scores, y)
 print('Initial loss =', sanity_data_loss)
 
 -- Train data
-local num = 100
+local num = 5000
 small_dset = {}
 small_dset.X_train = dset.X_train:narrow(1, 1, num)
 small_dset.y_train = dset.y_train:narrow(1, 1, num)
 small_dset.X_val = dset.X_val
 small_dset.y_val = dset.y_val
 
-local num_epoch = 50 
-local batch_size = 50
+local num_epoch = 30 
+local batch_size = 150
 local itr_per_epoch = math.max(math.floor(num / batch_size), 1)
 local reg = 0
 local num_iterations = itr_per_epoch * num_epoch
@@ -291,8 +302,8 @@ function f(w)
 end
 
 -- optimization process
---local old_val_acc = 0.
---local best_val_acc = 0.
+local old_val_acc = 0.
+local best_val_acc = 0.
 print('Training started...\n')
 while t < num_iterations do
     
@@ -307,13 +318,13 @@ while t < num_iterations do
     local val_acc = check_accuracy(small_dset.X_val, small_dset.y_val, model, batch_size)
     model:training()
     
-    --config.learningRate = config.learningRate / 1.5
+    config.learningRate = config.learningRate * 0.95
 
-    --[[if val_acc > old_val_acc then
+    if val_acc > old_val_acc then
 	--best_params, _ = params:copy()
         best_val_acc = val_acc
         old_val_acc = val_acc
-    end\\]]
+    end
 
     print('train acc: ', train_acc, 'val_acc: ', val_acc)
     print('\n')
