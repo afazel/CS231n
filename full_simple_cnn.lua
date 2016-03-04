@@ -315,6 +315,7 @@ params:copy(best_params)
 print('best val accuracy:', best_val_acc)
 print('saving the trained model...')
 torch.save('first_model.bin', model)
+-- to load model use: model = torch.load('file_name')
 
 -- plot results
 print('plot results...')
