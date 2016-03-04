@@ -181,6 +181,38 @@ local function full_conv_net(convlayer_params, affinelayer_params, w_scale)
   return model
 end
 
+-- save model
+local function save_model(model, out_file)
+
+  local next_weight_idx = 1
+  local next_bn_idx = 1
+  local f = hdf5.open(out_file, 'w')
+  for i = 1, #model do
+    local layer = model:get(i)
+    if torch.isTypeOf(layer, nn.SpatialConvolution) or 
+       torch.isTypeOf(layer, nn.Linear) then
+      f:write(string.format('/W%d', next_weight_idx), layer.weight:float())
+      f:write(string.format('/b%d', next_weight_idx), layer.bias:float())
+      next_weight_idx = next_weight_idx + 1
+    elseif torch.isTypeOf(layer, nn.SpatialBatchNormalization) or
+           torch.isTypeOf(layer, nn.BatchNormalization) then
+      f:write(string.format('/gamma%d', next_bn_idx), layer.weight:float())
+      f:write(string.format('/beta%d', next_bn_idx), layer.bias:float())
+      f:write(string.format('/running_mean%d', next_bn_idx), layer.running_mean:float())
+      if torch.isTypeOf(layer, nn.BatchNormalization) then
+        f:write(string.format('/running_var%d', next_bn_idx),
+                torch.pow(layer.running_std, -2.0):add(-layer.eps):float())
+      elseif torch.isTypeOf(layer, nn.SpatialBatchNormalization) then
+        f:write(string.format('/running_var%d', next_bn_idx),
+                layer.running_var:float())
+      end
+      next_bn_idx = next_bn_idx + 1
+    end
+  end
+  f:close()
+end
+
+
 -----------------------------Execution------------------------------------
 -- load the data
 local dset = load_data(path)
@@ -195,44 +227,38 @@ for k, v in pairs(dset) do
   end
 end
 
--- Build a sample model
---[[local convlayer_params = {['num_filters']= {32, 32}, ['filter_size']= {3, 3} ,['stride']={1, 1}, 
-                          ['s_batch_norm']= false, ['pool_dims']= 2, ['pool_strides']= 2}
-local affinelayer_params = {['hidden_dims']= {50}, ['batch_norm']= false,['dropout']= false}
 
-model = full_conv_net(convlayer_params, affinelayer_params)
-model:training()
-print('Model is generated. The architecture is:')
-print('\n')
-print(model)
-print('\n')]]--
-
--- compute loss and gradients
--- define log softmax criterion for loss computation
-crit = nn.CrossEntropyCriterion() 
-
--- Sanity check 1: initial loss
-local convlayer_params = {['num_filters']= {32, 32}, ['filter_size']= {3, 3} ,['stride']={1, 1}, 
-                          ['s_batch_norm']= true, ['pool_dims']= 2, ['pool_strides']= 2}
-local affinelayer_params = {['hidden_dims']= {100}, ['batch_norm']= true,['dropout']= false}
-
-local w_scale = 5e-2
-model = full_conv_net(convlayer_params, affinelayer_params, w_scale)
-model:training()
-
--- generate some data
+-- Sanity check 1: initial loss --> Passed!
+-- generate some data for sanity check
 require 'math'
 local x = torch.randn(100, 1, 48, 48)
 local y = torch.Tensor(100)
 for i = 1, 100 do
-	y[i] = math.random(1, 7)
+  y[i] = math.random(1, 7)
 end
 
+-- Build a sample model
+local convlayer_params = {['num_filters']= {32, 64}, ['filter_size']= {3, 3} ,['stride']={1, 1}, 
+                          ['s_batch_norm']= true, ['pool_dims']= 2, ['pool_strides']= 2}
+local affinelayer_params = {['hidden_dims']= {100}, ['batch_norm']= true,['dropout']= true}
+
+local w_scale = 5e-2
+model = full_conv_net(convlayer_params, affinelayer_params, w_scale)
+--cudnn.convert(model, cudnn)
+--model:cuda()
+model:training()
+print(model)
+
+-- define log softmax criterion for loss computation
+crit = nn.CrossEntropyCriterion() 
+
+
+-- sanity check 1 result:
 local sanity_scores = model:forward(x)
 local sanity_data_loss = crit:forward(sanity_scores, y)
-print('Initial loss =', sanity_data_loss)
+print('Initial loss =', sanity_data_loss , '(should be about log(7)=1.945)')
 
--- Train data
+-- Train realistic data
 local num = 5000
 small_dset = {}
 small_dset.X_train = dset.X_train:narrow(1, 1, num)
@@ -240,7 +266,7 @@ small_dset.y_train = dset.y_train:narrow(1, 1, num)
 small_dset.X_val = dset.X_val
 small_dset.y_val = dset.y_val
 
-local num_epoch = 30 
+local num_epoch = 20 
 local batch_size = 150
 local itr_per_epoch = math.max(math.floor(num / batch_size), 1)
 local reg = 0
@@ -249,7 +275,7 @@ local config = {
   learningRate= 0.0001,
 }
 
-print(model)
+
 local params, gradParams = model:getParameters()
 local t = 0
 
@@ -264,28 +290,6 @@ function f(w)
   local scores = model:forward(X_batch)
   local data_loss = crit:forward(scores, y_batch)
   local dscores = crit:backward(scores, y_batch)
-  
-  --------------- manually compute dscores ------------------
-  local max_scores, _ = torch.max(scores, 2)
-  local N = scores:size(1)
-  local probs = torch.Tensor(N, 7):zero()
-  for i = 1, N do
-  	for j = 1, 7 do 
-  		probs[i][j] = torch.exp(scores[i][j] - max_scores[i][1])
- 	end
-        probs[i] = torch.div(probs[i], torch.sum(probs[i]))
-
-  end
-
-  local dx = probs:clone()
-  for i = 1, N do
-	dx[i][ y_batch[i]] = dx[i][ y_batch[i]] - 1
-  end
-
-  dx = dx / N
-  --print(torch.sqrt(torch.sum((dx - dscores):cmul(dx - dscores))/(dx:size(1)*dx:size(2))))
-  --------------------------------------------------------------
-
   model:backward(X_batch, dscores)
   
   -- add regularization to loss
@@ -295,7 +299,7 @@ function f(w)
   --gradParams:add(reg, params)
   
   if t % itr_per_epoch == 0 then
-    print(t, '/', num_iterations, data_loss, torch.abs(gradParams):mean())
+    print(t,'/', num_iterations, data_loss, torch.abs(gradParams):mean())
   end
   
   return data_loss, gradParams
@@ -334,3 +338,4 @@ while t < num_iterations do
 end
 
 print('best val accuracy:', best_val_acc)
+save_model(model, 'first_model')
