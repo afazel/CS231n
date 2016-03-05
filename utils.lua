@@ -92,43 +92,9 @@ local function check_accuracy(X, y, model, batch_size)
 end
 
 
--- save model
-local function save_model(model, out_file)
-
-  local next_weight_idx = 1
-  local next_bn_idx = 1
-  local f = hdf5.open(out_file, 'w')
-  for i = 1, #model do
-    local layer = model:get(i)
-    if torch.isTypeOf(layer, nn.SpatialConvolution) or 
-       torch.isTypeOf(layer, nn.Linear) then
-      f:write(string.format('/W%d', next_weight_idx), layer.weight:float())
-      f:write(string.format('/b%d', next_weight_idx), layer.bias:float())
-      next_weight_idx = next_weight_idx + 1
-    elseif torch.isTypeOf(layer, nn.SpatialBatchNormalization) or
-           torch.isTypeOf(layer, nn.BatchNormalization) then
-      f:write(string.format('/gamma%d', next_bn_idx), layer.weight:float())
-      f:write(string.format('/beta%d', next_bn_idx), layer.bias:float())
-      f:write(string.format('/running_mean%d', next_bn_idx), layer.running_mean:float())
-      if torch.isTypeOf(layer, nn.BatchNormalization) then
-        f:write(string.format('/running_var%d', next_bn_idx),
-                torch.pow(layer.running_std, -2.0):add(-layer.eps):float())
-      elseif torch.isTypeOf(layer, nn.SpatialBatchNormalization) then
-        f:write(string.format('/running_var%d', next_bn_idx),
-                layer.running_var:float())
-      end
-      next_bn_idx = next_bn_idx + 1
-    end
-  end
-  f:close()
-end
-
-
-
 M.load_data = load_data
 M.preprocess_data = preprocess_data
 M.get_minibatch = get_minibatch
 M.check_accuracy = check_accuracy
-M.save_model = save_model
 
 return M
