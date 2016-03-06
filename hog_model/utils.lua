@@ -77,7 +77,15 @@ local function get_minibatch(X, y, batch_size)
 
 end
 
+local function get_hog_minibatch(X, y, hog, batch_size)
 
+  local mask = torch.LongTensor(batch_size):random(X:size(1))
+  local X_batch = X:index(1, mask)
+  local hog_batch = hog:index(1, mask)
+  local y_batch = y:index(1, mask)
+  return X_batch, y_batch, hog_batch
+
+end
 
 local function check_accuracy(X, y, model, batch_size)
    
@@ -112,12 +120,12 @@ local function hog_check_accuracy(X, y, hog, model1, model2, batch_size)
   local num_tested = 0
     
   for t = 1, 20 do
-    local X_batch, y_batch = get_minibatch(X, y, batch_size)
+    local X_batch, y_batch, hog_batch = get_hog_minibatch(X, y, hog, batch_size)
     
     --X_batch = X_batch:cuda()
     --y_batch = y_batch:cuda()
     local conv_output = model1:forward(X_batch)
-    local fc_input = torch.cat(conv_output, hog, 2)
+    local fc_input = torch.cat(conv_output, hog_batch, 2)
     local scores = model2:forward(fc_input)
     local _, y_pred = scores:max(2)
     --y_batch = torch.LongTensor():resize(y_batch:size()):copy(y_batch)
@@ -130,8 +138,10 @@ end
 
 
 M.load_data = load_data
+M.load_hog = load_hog
 M.preprocess_data = preprocess_data
 M.get_minibatch = get_minibatch
+M.get_hog_minibatch = get_hog_minibatch
 M.check_accuracy = check_accuracy
 M.hog_check_accuracy = hog_check_accuracy
 

@@ -1,8 +1,9 @@
 require 'torch'
-require 'dp'
+require 'nn'
+require 'cutorch'
+require 'cunn'
+require 'cudnn'
 require 'hdf5'
-require 'optim'
-require 'gnuplot' --or 'image'
 
 local M = {}
 
@@ -21,17 +22,6 @@ local function load_data(data_file_path)
   print('Data is loaded!')
     
   return dset
-end
-
-local function load_hog(hog_path)
-  local f = hdf5.open(hog_path)
-
-  local hog_features = {}
-  hog_features.X_train = f:read('X_train_feats'):all()
-  hog_features.X_val = f:read('X_val_feats'):all()
-  hog_features.X_test = f:read('X_test_feats'):all()
-
-  return hog_features 
 end
 
 
@@ -90,35 +80,9 @@ local function check_accuracy(X, y, model, batch_size)
   for t = 1, 20 do
     local X_batch, y_batch = get_minibatch(X, y, batch_size)
     
-    --X_batch = X_batch:cuda()
-    --y_batch = y_batch:cuda()
+    X_batch = X_batch:cuda()
+    y_batch = y_batch:cuda()
     local scores = model:forward(X_batch)
-    local _, y_pred = scores:max(2)
-    --y_batch = torch.LongTensor():resize(y_batch:size()):copy(y_batch)
-    num_correct = num_correct + torch.eq(y_pred, y_batch):sum()
-    num_tested = num_tested + batch_size
-  end
-  return num_correct / num_tested
-
-end
-
-local function hog_check_accuracy(X, y, hog, model1, model2, batch_size)
-   
-  --[[ change the model mode to evaluation, Improtant for dropout 
-  and batchnormalization ]]--
-  model1:evaluate()
-  model2:evaluate()
-  local num_correct = 0
-  local num_tested = 0
-    
-  for t = 1, 20 do
-    local X_batch, y_batch = get_minibatch(X, y, batch_size)
-    
-    --X_batch = X_batch:cuda()
-    --y_batch = y_batch:cuda()
-    local conv_output = model1:forward(X_batch)
-    local fc_input = torch.cat(conv_output, hog, 2)
-    local scores = model2:forward(fc_input)
     local _, y_pred = scores:max(2)
     --y_batch = torch.LongTensor():resize(y_batch:size()):copy(y_batch)
     num_correct = num_correct + torch.eq(y_pred, y_batch):sum()
@@ -133,6 +97,5 @@ M.load_data = load_data
 M.preprocess_data = preprocess_data
 M.get_minibatch = get_minibatch
 M.check_accuracy = check_accuracy
-M.hog_check_accuracy = hog_check_accuracy
 
 return M
