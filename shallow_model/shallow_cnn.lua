@@ -12,7 +12,7 @@ local build_model = require('build_model')
 
 
 -- load and preprocess the data
-data_path = 'dataset/data.h5'
+data_path = '../dataset/data.h5'
 dset = utils.load_data(data_path)
 dset = utils.preprocess_data(dset)
 
@@ -37,9 +37,9 @@ y:cuda()
 
 ----------------------------Build a model------------------------------------
 -- 1. model parameters
-local convlayer_params = {['num_filters']= {64, 128, 512, 512}, ['filter_size']= {3, 5, 3, 3} ,['stride']={1, 1, 1, 1}, 
-                          ['s_batch_norm']= true, ['max_pooling'] = {true, true, true, true}, ['pool_dims']= 2, ['pool_strides']= 2, ['dropout']={true}}
-local affinelayer_params = {['hidden_dims']= {256, 512}, ['batch_norm']= true, ['dropout']= true}
+local convlayer_params = {['num_filters']= {32, 64}, ['filter_size']= {3, 3} ,['stride']={1, 1}, 
+                          ['s_batch_norm']= true, ['max_pooling'] = {false, true}, ['pool_dims']= 2, ['pool_strides']= 2, ['dropout']={true}}
+local affinelayer_params = {['hidden_dims']= {512}, ['batch_norm']= true, ['dropout']= true}
 
 local w_scale = 1e-3
 
@@ -68,13 +68,13 @@ small_dset.y_train = dset.y_train:narrow(1, 1, num)
 small_dset.X_val = dset.X_val
 small_dset.y_val = dset.y_val
 
-local num_epoch = 35 
+local num_epoch = 30 
 local batch_size = 128
 local itr_per_epoch = math.max(math.floor(num / batch_size), 1)
-local reg = 1e-7
+local reg = 1e-6
 local num_iterations = itr_per_epoch * num_epoch
 local config = {
-  learningRate= 0.01,
+  learningRate= 0.001,
 }
 
 
@@ -103,7 +103,7 @@ function f(w)
   
   loss_history[t] = data_loss 
   if t % itr_per_epoch == 0 then
-    print(string.format('%d / %d', t, num_iterations), string.format('loss:%f , mean(grads):%f' ,data_loss, torch.abs(gradParams):mean()))
+    print(t,'/', num_iterations, data_loss, torch.abs(gradParams):mean())
   end
   
   return data_loss, gradParams
@@ -138,7 +138,7 @@ while t < num_iterations do
         best_val_acc = val_acc[epoch_counter]
     end
 
-    print(string.format('train acc:%f , val_acc:%f', train_acc[epoch_counter], val_acc[epoch_counter]))
+    print('train acc: ', train_acc[epoch_counter], 'val_acc: ', val_acc[epoch_counter])
     print('\n')
     epoch_counter = epoch_counter +1
         
@@ -174,12 +174,12 @@ gnuplot.plotflush()
 
 -------------------------Store model---------------------------
 print('Saving the trained model and history...')
-torch.save('deep_model.bin', model)
+torch.save('shallow_model.bin', model)
 -- to load model use: model = torch.load('file_name')
 
 local training_hist = {
 
-        num_epoch = num_epoch,
+         num_epoch = num_epoch,
 	num_iterations = num_iterations,
 	loss_history = loss_history,
 	train_acc = train_acc,
